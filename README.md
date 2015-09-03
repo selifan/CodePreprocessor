@@ -48,9 +48,6 @@ and executing respective logic.
 Each macros starts with '#' char. Macros are case insensitive, but following var names (if applicable) are NOT !
 Second (and next, if supported) operand should be a parameter name. Expressions NOT supported.
 
-**IF** resolves to TRUE if value with respective key exists in parameter array and has non-empty value.
-The same rule works for \#ELSEIF macros.
-
 **\#IF** var_name[,var_name2...] - starts **IF** block (following lines until first #ENDIF|#ELSE|#ELSEIF will be handled / outputted to the result code
 if 'var_name' value in passed vars array is not empty / zero.
 It is possible to use more than one var name (comma or space delimited). \#IF fires TRUE if any one of them
@@ -111,4 +108,3 @@ Working sample demonstrating code preprocessing is in "examples" folder :
 ## License
 Distributed under BSD (v3) License :
 http://opensource.org/licenses/BSD-3-Clause
-
