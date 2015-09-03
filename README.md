@@ -102,8 +102,8 @@ parse() returns a string that can be written to final generated file (by file_pu
 ## Nesting
 Unlimited depth of macros nesting supported (SWITCH inside IF/ELSEIF/ELSE inside IF ...)
 
-Working sample demonstrating code preprocessing is in "examples" folder :
-[examples/preproc.php](examples/preproc.php)
+Working sample demonstrating code preprocessing is in "tests" folder :
+[tests/preproc.php](tests/preproc.php)
 
 ## License
 Distributed under BSD (v3) License :
