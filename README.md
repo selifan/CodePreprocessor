@@ -53,20 +53,21 @@ if 'var_name' value in passed vars array is not empty / zero.
 It is possible to use more than one var name (comma or space delimited). \#IF fires TRUE if any one of them
 is not empty.
 
-**\#ELSEIF var_name** or **\#ELIF var_name** - starts ELSEIF block (following lines will do if none of previous IF/ELSEIF cases did not match and value in this line is true / non-empty.
+**\#ELSEIF var_name** or **\#ELIF var_name** - starts ELSEIF block (following lines will do if none of previous IF/ELSEIF cases resolved to TRUE
+and value in this line is true / non-empty.
 As usual, there may be many ELSEIF's after starting IF macro.
 Like in **IF**, more than one var name can be used (comma or space delimited).
 
-**\#ELSE** - starts ELSE block (following lines will be added to result if none of previous IF/ELSEIF fired "true").
+**\#ELSE** - starts ELSE block (following lines will be added to result if none of previous IF/ELSEIF resolved to TRUE).
 **\#ENDIF** - finalizing IF block.
 
 **\#SWITCH var_name**  - starts SWITCH / CASE / DEFAULT / ENDSWITCH block. var_name is a key for value in passed var array,
   that will be checked against all "CASE nnnn" values. Unlike "standard" SWITCH in C, PHP and other languages, there is no "BREAK" command here:
   next "CASE" macro line stops handling lines from previous CASE[s], so each "CASE" is like "ELSEIF" in IF block - when it ends, code generating stops until \#ENDCASE.
 
-**\#CASE** value[,value2,...] - starts CASE blok inside SWITCH. Block is handled if following "value" matches "var_name" value.
-  It is possible to have CASE with multiple values (comma or space delimited) -
-  such a CASE will trigger if any of values matches to SWITCH var.
+**\#CASE** value[,value2,...] - starts CASE blok inside SWITCH. Block is handled if following "value" matches "var_name"-keyed value in parameter array.
+  Like in **IF** or **ELSEIF**, it's possible to have CASE with multiple values to be checked (comma or space delimited) -
+  such a **CASE** will trigger if any of values matches to SWITCH var.
 
 **\#DEFAULT** - starts final DEFAULT block - this block is handled if none of previous cases worked.
 
