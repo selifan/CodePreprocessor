@@ -95,12 +95,15 @@ $preproc -> setLF('unix') -> setSourceFolder($myfolder)->parse($my_params);
 `parse($src, $vars=array(), $subst=FALSE)` - main method that performs preprocessing of source file or multi-line string passed in first parameter,
 If $src is existing file name, that file will be read as a source code, otherwise $src itself will be used.
 $vars must be an associative array 'key' => 'value', holding all needed parameters for preprocessing.
-If some var names in "IF", "CASE" operators not found in $vars, FALSE value used.
+If some var names in `IF`, `CASE` operators not found in $vars, FALSE value used.
 
-Optional third parameter $vars can activate "variable substitution" in soucer lines:
+Optional third parameter `$subst` can activate "variable substitution" in source lines.
+
 Say, somewhere in the template source code you have a %some_var% string, to be substituted by something useful during
 code generation.
+
 You can pass separated associative array as a third parameter to `parse()`, or just set it TRUE, and all substitute pairs will be constructed from the main $vars array.
+
 Preprocessor suggests each variable in template to be prefixed and postfixed by '%' char, to avoid unwanted replaces.
 But you can change that prefix and postfix by function `setSubstWrappers()` :
 
