@@ -1,0 +1,36 @@
+# This is an example of source code to be pre-processed.
+#IF use_auth,my_auth
+// using auth module ...
+include_once('myclass.auth.php');
+  #SWITCH sw_lang
+  #CASE ru
+include_once('auth.lang_russian.php')
+  #CASE en,english,uk,us
+include_once('auth.lang_english.php')
+  #CASE de,german
+include_once('auth.lang_german.php')
+  #DEFAULT
+include_once('auth.lang_default.php')
+  #ENDSWITCH
+$auth = new Auth();
+$success = $auth -> checkUSerCredentials();
+//  other auth code here...
+#ELSE
+// no auth used, so success is alwais TRUE...
+$success = TRUE;
+#ENDIF
+// var substituting in source code demonstration:
+$title = '%program_title%';
+
+#SWITCH sw_lang
+#CASE ru
+include_once('app.lang_russian.php')
+#CASE en,english,uk,us
+include_once('app.lang_english.php')
+#CASE de,german
+include_once('app.lang_german.php')
+#DEFAULT
+include_once('app.lang_default.php')
+#ENDSWITCH
+
+// Here is the rest of your php code ...

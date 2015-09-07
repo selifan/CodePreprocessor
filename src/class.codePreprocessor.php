@@ -3,9 +3,9 @@
 * @name class.codePreprocessor.php
 * Source code parsing / preprocessing engine
 * @Author Alexander Selifonov <alex [at] selifan {dot} ru>
-* @Version 1.0.001
+* @Version 1.1.002
 * @link http://www.selifan.ru, https://github.com/selifan
-* modified 2015-09-03
+* modified 2015-09-07
 **/
 
 class CodePreprocessor {
@@ -21,7 +21,7 @@ class CodePreprocessor {
       ,'ENDSWITCH'  => '#ENDSWITCH'
       ,'INCLUDE' => '#INCLUDE'
     );
-
+    protected $_subst_wrappers = array('%','%');
     protected $CRLF = "\n";
     protected $_srcfolder = '';
     protected $_err = array();
@@ -56,13 +56,38 @@ class CodePreprocessor {
     }
 
     /**
+    * Setting wrapping strings for "substitute" vars
+    *
+    * @param mixed $prefix string used as prefix in var to replace
+    * @param mixed $postfix string used as postfix. If empty, will be the same as $prefix
+    * @return this object reference
+    */
+    public function setSubstWrappers($prefix, $postfix=FALSE) {
+        if (!empty($prefix)) {
+            $this->_subst_wrappers[0] = $prefix;
+            $this->_subst_wrappers[1] = ($postfix ? $postfix : $prefix);
+        }
+        return $this;
+    }
+
+    /**
     * Parses source from passed string (can be a file name)
     *
     * @param mixed $src text or file name
     * @param mixed $vars assoc.array, user defined pairs "key" => value
+    * @param mixed $subst TRUE or assoc.array to turn ON "substitute" mode, @since 1.1.002
     */
-    public function parse($src, $vars=array()) {
+    public function parse($src, $vars=array(), $subst=FALSE) {
 
+        $ar_subst = $substs = FALSE;
+        if ($subst) {
+            $ar_subst = is_array($subst) ? $subst : $vars;
+            $substs = array();
+            foreach ($ar_subst as $key => $val) {
+                $substs[$this->_subst_wrappers[0] . $key . $this->_subst_wrappers[1]] = $val;
+            }
+            unset($ar_subst);
+        }
         if (is_file($src)) $src = file_get_contents($src);
         $lines = explode("\n", $src);
         $output = array();
@@ -177,8 +202,12 @@ class CodePreprocessor {
                . $this->_srcfolder . $this->_tokens[1];
             continue;
           }
-          $do_it = $this->_isLineActive($ifstate ,$iflevel);
-          if ( !$b_logic && $do_it ) $output[] = rtrim($srcline);
+
+          if ( !$b_logic && $this->_isLineActive($ifstate ,$iflevel) ) {
+              if ($substs) $srcline = str_replace(array_keys($substs), array_values($substs), $srcline);
+              $output[] = rtrim($srcline);
+          }
+
         }
 
         return implode($this->CRLF, $output);
