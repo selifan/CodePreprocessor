@@ -19,6 +19,8 @@ $success = $auth -> checkUSerCredentials();
 // no auth used, so success is alwais TRUE...
 $success = TRUE;
 #ENDIF
+// var substituting in source code demonstration:
+$title = '%program_title%';
 
 #SWITCH sw_lang
 #CASE ru
