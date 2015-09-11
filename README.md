@@ -59,6 +59,7 @@ As usual, there may be many ELSEIF's after starting IF macro.
 Like in `IF`, more than one var name can be used (comma or space delimited).
 
 **#ELSE** - starts `ELSE` block (following lines will be added to result if none of previous IF/ELSEIF resolved to TRUE).
+
 **#ENDIF** - finalizing `IF` block.
 
 **#SWITCH var_name**  - starts `SWITCH` / `CASE` / `DEFAULT` / `ENDSWITCH` block. var_name is a key for value in passed var array,
