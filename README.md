@@ -81,7 +81,8 @@ Like in `IF`, more than one var name can be used (comma or space delimited).
   Start and End values should be numeric values, and in case of positive step value2 must be greater than value1 (and lesser in otherwise case), 
 
 Second supported **FOR** operator form:
-**#FOR var_name IN value1,value2,... - in this form loop you pass a list of all values for loop variable (var_name), delimited by comma or space char.
+
+**#FOR** var_name IN value1,value2,... - in this form loop you pass a list of all values for loop variable (var_name), delimited by comma or space char.
   Inside loop you can use **%var_name%** macro to be substituted with current variable value
 
 ## Method list
