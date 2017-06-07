@@ -76,6 +76,13 @@ Like in `IF`, more than one var name can be used (comma or space delimited).
 
 **#INCLUDE** file_name starts precompiling another source file. Result will be added to output.
 
+**#FOR** var_name FROM value1 TO value2 [STEP value3] - starts FOR loop.
+  var_name is a name of "internal" loop variable, "value1" is a beginning value, value2 - final loop value, optional value3 is a step between iterations (default 1).
+  Start and End values should be numeric values, and in case of positive step value2 must be greater than value1 (and lesser in otherwise case), 
+  Second FOR loop form:
+**#FOR var_name IN value1,value2,... - in this form loop you pass a list of all values for loop variable (var_name), delimited by comma or space char.
+  Inside loop you can use **%var_name%** macro to be substituted with current variable value
+
 ## Method list
 
 `setLF($style)` : sets "new line" char to "windows" or unix style. By default, when creating instance, "new line" chars
@@ -126,3 +133,4 @@ Working sample demonstrating code preprocessing is in "tests" folder :
 ## License
 Distributed under BSD (v3) License :
 http://opensource.org/licenses/BSD-3-Clause
+
