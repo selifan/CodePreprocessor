@@ -3,9 +3,9 @@
 * @name class.codePreprocessor.php
 * Source code parsing / preprocessing engine
 * @Author Alexander Selifonov <alex [at] selifan {dot} ru>
-* @Version 1.1.002
-* @link http://www.selifan.ru, https://github.com/selifan
-* modified 2015-09-07
+* @Version 1.2.005
+* @link https://github.com/selifan/CodePreprocessor
+* modified 2017-06-07
 **/
 
 class CodePreprocessor {
@@ -20,13 +20,22 @@ class CodePreprocessor {
       ,'DEFAULT' => '#DEFAULT'
       ,'ENDSWITCH'  => '#ENDSWITCH'
       ,'INCLUDE' => '#INCLUDE'
+      ,'SET' => '#SET'
+      ,'FOR' => '#FOR'
+      ,'ENDFOR' => array('#ENDFOR','#ENDF')
     );
     protected $_subst_wrappers = array('%','%');
     protected $CRLF = "\n";
     protected $_srcfolder = '';
     protected $_err = array();
-
+	private   $_vars = array();
+	private   $_evalError = '';
+	private $lineno = 0;
     protected $_tokens = 0;
+
+    private $_loopStack = array();
+    private $_loopLevel = 0;
+    private $substs = array();
 
     public function __construct() {
         if (stripos(PHP_OS, 'win')!==FALSE) $this->CRLF = "\r\n";
@@ -75,16 +84,17 @@ class CodePreprocessor {
     *
     * @param mixed $src text or file name
     * @param mixed $vars assoc.array, user defined pairs "key" => value
-    * @param mixed $subst TRUE or assoc.array to turn ON "substitute" mode, @since 1.1.002
+    * @param mixed $subst TRUE or assoc.array to turn ON "substitute" mode, @since 1.0.002
     */
-    public function parse($src, $vars=array(), $subst=FALSE) {
+    public function parse($src, $vars = array(), $subst=FALSE) {
 
         $ar_subst = $substs = FALSE;
+        $this->_vars = $vars;
         if ($subst) {
             $ar_subst = is_array($subst) ? $subst : $vars;
-            $substs = array();
+            $this->substs = array();
             foreach ($ar_subst as $key => $val) {
-                $substs[$this->_subst_wrappers[0] . $key . $this->_subst_wrappers[1]] = $val;
+                $this->substs[$this->_subst_wrappers[0] . $key . $this->_subst_wrappers[1]] = $val;
             }
             unset($ar_subst);
         }
@@ -105,8 +115,9 @@ class CodePreprocessor {
         $ifdone = array(FALSE);
         $b_logic = FALSE;
 
-        foreach($lines as $lineno => $srcline) {
+        for($this->lineno=0; $this->lineno<count($lines); $this->lineno++) {
 
+          $srcline = $lines[$this->lineno];
           $lcmd = $this->_getOpCode($srcline);
           $b_logic = FALSE;
 
@@ -116,25 +127,36 @@ class CodePreprocessor {
             $iflevel++;
             if(count($this->_tokens)<2) $value = FALSE;
             else {
-
-                $var_name = $this->_tokens[1];
-                $ifstate[$iflevel] = $ifdone[$iflevel] = $this->_evaluateParams($vars);
+				$expr = self::_dropFirstToken($srcline);
+                $evaled = $this->_evalExpression($expr);
+                if ($evaled === null) {
+                	$this->_err[] = "Line ".($this->lineno+1).": Wrong IF expresion, ".$this->_evalError;
+                	$evaled = false;
+				}
+                $ifstate[$iflevel] = $ifdone[$iflevel] = $evaled;
                 $ifbranch[$iflevel] = 'if';
             }
           }
           elseif($lcmd === 'ELSEIF') {
-
+		  	$expr = self::_dropFirstToken($srcline);
             $b_logic = TRUE;
 
             if($iflevel>0 && ($ifbranch[$iflevel]==="if" || $ifbranch[$iflevel] === "elseif")) {
               if($ifdone[$iflevel]) { $ifstate[$iflevel] = FALSE; }
               elseif ( count($this->_tokens)<2 ) $ifstate[$iflevel] = FALSE;
-              else $ifstate[$iflevel] = $this->_evaluateParams($vars);
+              else {
+			      $evaled = $this->_evalExpression($expr);
+			      if ($evaled === null) {
+                  	  $this->_err[] = "Line ".($this->lineno+1).": Wrong ELSEIF expresion, ".$this->_evalError;
+			      	  $evaled = false;
+				  }
+              	  $ifstate[$iflevel] = $evaled;
+			  }
 
               $ifbranch[$iflevel] = 'elseif';
               if($ifstate[$iflevel]) $ifdone[$iflevel] = TRUE;
             }
-            else $this->_err[] = "Line ".($lineno+1).": Wrong #ELSEIF";
+            else $this->_err[] = "Line ".($this->lineno+1).": #ELSEIF without respective #IF,#ELSE";
           }
           elseif ($lcmd === 'ELSE') {
 
@@ -143,13 +165,13 @@ class CodePreprocessor {
               $ifstate[$iflevel]=!$ifdone[$iflevel];
               $ifbranch[$iflevel]='else';
             }
-            else $this->_err[] = "Line ".($lineno+1).": Wrong #ELSE";
+            else $this->_err[] = "Line ".($this->lineno+1).": Wrong #ELSE";
           }
           elseif ($lcmd === 'ENDIF') {
 
             $b_logic = TRUE;
             if($iflevel>0) $iflevel--;
-            else $this->_err[] = "Line ".($lineno+1).": Wrong #ENDIF";
+            else $this->_err[] = "Line ".($this->lineno+1).": Wrong #ENDIF";
           }
           elseif ($lcmd === 'SWITCH') {
 
@@ -168,7 +190,7 @@ class CodePreprocessor {
 
             $b_logic = TRUE;
             if ( $iflevel<=0 || ($ifbranch[$iflevel]!=="switch") ) {
-               $this->_err[] = "Line ".($lineno+1).": Wrong #CASE (not in #SWITCH block)";
+               $this->_err[] = "Line ".($this->lineno+1).": Wrong #CASE (not in #SWITCH block)";
                continue;
             }
             $ifstate[$iflevel] = FALSE;
@@ -182,7 +204,7 @@ class CodePreprocessor {
 
             $b_logic = TRUE;
             if ( $iflevel<=0 || ($ifbranch[$iflevel]!=="switch") ) {
-               $this->_err[] = "Line ".($lineno+1).": Wrong #DEFAULT (not in #SWITCH block)";
+               $this->_err[] = "Line ".($this->lineno+1).": Wrong #DEFAULT (not in #SWITCH block)";
                continue;
             }
             $ifstate[$iflevel] = !$ifdone[$iflevel]; # no case was TRUE, so execute DEFAULT block
@@ -191,20 +213,58 @@ class CodePreprocessor {
 
             $b_logic = TRUE;
             if($iflevel>0 && $ifbranch[$iflevel] === 'switch') $iflevel--;
-            else $this->_err[] = "Line ".($lineno+1).": Wrong #ENDSWITCH";
+            else $this->_err[] = "Line ".($this->lineno+1).": Wrong #ENDSWITCH";
           }
-          elseif ($lcmd === 'INCLUDE') {
+          elseif ($lcmd === 'INCLUDE') { // load / parse another file
             $do_it = $this->_isLineActive($ifstate ,$iflevel);
             if (isset($this->_tokens[1]) && is_file($this->_srcfolder . $this->_tokens[1])) {
               $output[] = $this->parse($this->_srcfolder . $this->_tokens[1]);
             }
-            else $this->_err[] = "Line ".($lineno+1).": Wrong source file name in #INCLUDE command : "
+            else $this->_err[] = "Line ".($this->lineno+1).": Wrong source file name in #INCLUDE command : "
                . $this->_srcfolder . $this->_tokens[1];
             continue;
           }
+          elseif ($lcmd === 'SET') { // setting value to "var"
+		  	 $evalString = trim(substr(ltrim($srcline),4));
+			 $eqpos = strpos($evalString, '=');
+			 if ($eqpos > 0) {
+			 	 $newvar = trim(substr($evalString,0,$eqpos));
+			 	 $expression = trim(substr($evalString,$eqpos+1));
+
+			 	 if ($newvar =='') {
+			 	 	 $this->_err[] = "Line ".($this->lineno+1). " - SET empty var name";
+			 	 	 continue;
+				 }
+				 $evaled = $this->_evalExpression($expression);
+				 if ($evaled === null) {
+   				 	$this->_err[] = "Line ".($this->lineno+1) . ' SET expression error,' . $this->_evalError;
+   				 	continue;
+				 }
+
+#			 	 $output[] = "NEW var: $newvar, expression: $expression";
+
+			 	 $this->_vars[$newvar] = $evaled;
+			 	 $this->substs[$this->_subst_wrappers[0] . $newvar . $this->_subst_wrappers[1]] = $evaled;
+#		 	 	 $output[] = "// New var calculated: $newvar = $evaled";
+
+			 }
+			 else $this->_err[] = "Wrong SET operator: must be 'varname = {expression}'";
+#          	  WriteDebugInfo('SET operator,rest line :',$evalString);
+			 continue;
+		  }
+
+		  elseif ( $lcmd === 'FOR') { # loop begin
+		      $result = $this->_ForLoopStarts($srcline);
+		      if (!$result) $this->_err[] = "Line ".($this->lineno+1)." - wrong FOR operator";
+		      continue;
+		  }
+		  elseif ( $lcmd === 'ENDFOR') { # loop end
+		      $this->_ForLoopEnds();
+		      continue;
+		  }
 
           if ( !$b_logic && $this->_isLineActive($ifstate ,$iflevel) ) {
-              if ($substs) $srcline = str_replace(array_keys($substs), array_values($substs), $srcline);
+              if ($this->substs) $srcline = strtr($srcline, $this->substs);
               $output[] = rtrim($srcline);
           }
 
@@ -212,6 +272,121 @@ class CodePreprocessor {
 
         return implode($this->CRLF, $output);
     }
+    private function _findNextToken(&$line) {
+        if ($line === '') return '';
+    	$ret = '';
+    	$ipos = 0;
+    	$kkk = 0; # debug stopper
+    	while($ipos < strlen($line) && $kkk++<500) {
+            $onechar = substr($line,$ipos,1);
+            if ($onechar === ' ' || $onechar == "\t") break;
+            if (in_array($onechar, array(',', ':', '!', '?', '/', '\\',';','*'))) {
+                if ($ipos === 0) {
+		            $line = substr($line, $ipos+1);
+		            return $onechar;
+				}
+				break;
+			}
+	   		$ret .= $onechar;
+            $ipos++;
+		}
+		$line = ltrim(substr($line, $ipos));
+		return $ret;
+	}
+
+    private function _ForLoopStarts($line) {
+        # supported FOR syntax:
+    	# 1) FOR VARNAME IN {VAL1},{VAL2},{VAL3},...
+    	# 2) FOR VARNAME FROM {INT_START} TO {INT_END} [STEP INT_STEP]
+    	$stage = 0;
+    	$srcline = trim($line);
+    	$this->_findNextToken($srcline); # #for just for skip
+    	$varname = $this->_findNextToken($srcline); # must be a varname
+    	$inword = $this->_findNextToken($srcline); # should be IN or FROM
+    	if (strtoupper($inword) === 'FROM') {
+            $step = 1;
+    		$value1 = $this->_findNextToken($srcline); # value N1
+    		$value2 = $this->_findNextToken($srcline); #
+    		if (strtoupper($value2)==='TO') $value2 = $this->_findNextToken($srcline);
+    		$steptok = $this->_findNextToken($srcline);
+    		if (strtoupper($steptok)==='STEP')
+    			$step = intval($this->_findNextToken($srcline));
+
+            if (($value2 > $value1 && $step<=0) || ($value2 < $value1 && $step>=0)) {
+            	$this->err[] = 'Error in FROM or TO or STEP value (endless loop!)';
+            	return FALSE;
+			}
+
+            $values = range($value1, $value2, $step);
+		}
+    	elseif (strtoupper($inword) === 'IN') {
+            $values = array();
+			while($token = $this->_findNextToken($srcline)) {
+				if ($token !==',') $values[] = $token;
+			}
+		}
+		else return FALSE;
+
+		$this->_loopLevel++;
+		$this->_loopStack[$this->_loopLevel] = array(
+			'varname' => $varname,
+			'values'  => $values,
+			'startline' => ($this->lineno+1),
+			'iteration' => 0,
+			'code'    => array(),
+		);
+        $this->_vars[$varname] = $values[0];
+        $this->substs[$this->_subst_wrappers[0] . $varname . $this->_subst_wrappers[1]] = $values[0];
+        return TRUE;
+	}
+
+    private function _ForLoopEnds() {
+
+        if ($this->_loopLevel > 0) {
+        	# ...
+            $this->_loopStack[$this->_loopLevel]['iteration']++;
+            $curitem = $this->_loopStack[$this->_loopLevel]['iteration'];
+            if ($this->_loopStack[$this->_loopLevel]['iteration']>=count($this->_loopStack[$this->_loopLevel]['values'])) {
+				$this->_loopLevel--;
+			}
+			else {
+                $vname = $this->_loopStack[$this->_loopLevel]['varname'];
+
+                $vval = $this->_loopStack[$this->_loopLevel]['values'][$curitem];
+				$this->_vars[$vname] = $vval;
+        		$this->substs[$this->_subst_wrappers[0] . $vname . $this->_subst_wrappers[1]] = $vval;
+				$this->lineno = $this->_loopStack[$this->_loopLevel]['startline']-1; #back to first working line in loop
+			}
+		}
+		else
+			$this->_err[] = "Error, line ".$this->lineno. ' - ENDFOR without corrsponding FOR';
+	}
+
+	private static function _dropFirstToken($strg) {
+		$ret = trim($strg);
+		while (!in_array(substr($ret,0,1), array(' ',"\t")) && !empty($ret)) {
+			$ret = substr($ret,1);
+		}
+		return ltrim($ret);
+	}
+
+    private function _evalExpression($exprstring) {
+
+		$result = null;
+		$this->_evalError = '';
+		foreach($this->_vars as $key=>$val) {
+			$realvar = is_numeric($val) ? $val : "'$val'";
+    		$exprstring = preg_replace('/\b'.$key.'\b/i', $realvar, $exprstring);
+		}
+		$__my__ = null;
+	 	try {
+			eval("\$__my__ = $exprstring;");
+			$result = $__my__;
+		} catch(Exception $e) {
+   			$this->_evalError = "Bad expression, " . $e->getMessage();
+		}
+		return $result;
+	}
     # evaluate vars list after operator
     private function _evaluateParams($vars) {
 
