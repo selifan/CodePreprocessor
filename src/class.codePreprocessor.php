@@ -273,7 +273,23 @@ class CodePreprocessor {
         return implode($this->CRLF, $output);
     }
     private function _findNextToken(&$line) {
+		$line = ltrim($line);
         if ($line === '') return '';
+        $strDelim = FALSE;
+		if (substr($line,0,1) === '"') $strDelim = '"';
+		elseif (substr($line,0,1) === "'") $strDelim = "'";
+		if ($strDelim) {
+			$endDelim = strpos($line,$strDelim,1);
+			if ($endDelim === FALSE) {
+				$this->_err[] = "Line ".$this->lineno. " - No ending delimiter [$strDelim] in the string";
+                $ret = $line;
+				$line = '';
+				return $ret;
+			}
+			$ret = substr($line, 1, ($endDelim-1)); # without quotes!
+			$line = substr($line,$endDelim+1);
+			return $ret;
+		}
     	$ret = '';
     	$ipos = 0;
     	$kkk = 0; # debug stopper
@@ -287,11 +303,19 @@ class CodePreprocessor {
 				}
 				break;
 			}
-	   		$ret .= $onechar;
+            if (!in_array($onechar, array(' ',"\t")))
+	   			$ret .= $onechar;
             $ipos++;
 		}
 		$line = ltrim(substr($line, $ipos));
 		return $ret;
+	}
+	public function parseToTokens($line) {
+		$toks = array();
+		while(($onetoken = $this->_findNextToken($line))) {
+			$toks[] = $onetoken;
+		}
+		return $toks;
 	}
 
     private function _ForLoopStarts($line) {
@@ -305,15 +329,16 @@ class CodePreprocessor {
     	$inword = $this->_findNextToken($srcline); # should be IN or FROM
     	if (strtoupper($inword) === 'FROM') {
             $step = 1;
-    		$value1 = $this->_findNextToken($srcline); # value N1
+    		$value1 = floatval($this->_findNextToken($srcline));
     		$value2 = $this->_findNextToken($srcline); #
-    		if (strtoupper($value2)==='TO') $value2 = $this->_findNextToken($srcline);
+    		if (strtoupper($value2)==='TO') $value2 = floatval($this->_findNextToken($srcline));
+    		if ($value2 < $value1) $step = -1;
     		$steptok = $this->_findNextToken($srcline);
     		if (strtoupper($steptok)==='STEP')
-    			$step = intval($this->_findNextToken($srcline));
+    			$step = floatval($this->_findNextToken($srcline));
 
             if (($value2 > $value1 && $step<=0) || ($value2 < $value1 && $step>=0)) {
-            	$this->err[] = 'Error in FROM or TO or STEP value (endless loop!)';
+            	$this->err[] = 'Error in FROM or TO or STEP value';
             	return FALSE;
 			}
 
@@ -350,12 +375,12 @@ class CodePreprocessor {
 				$this->_loopLevel--;
 			}
 			else {
-                $vname = $this->_loopStack[$this->_loopLevel]['varname'];
 
+                $vname = $this->_loopStack[$this->_loopLevel]['varname'];
                 $vval = $this->_loopStack[$this->_loopLevel]['values'][$curitem];
 				$this->_vars[$vname] = $vval;
         		$this->substs[$this->_subst_wrappers[0] . $vname . $this->_subst_wrappers[1]] = $vval;
-				$this->lineno = $this->_loopStack[$this->_loopLevel]['startline']-1; #back to first working line in loop
+				$this->lineno = $this->_loopStack[$this->_loopLevel]['startline']-1;
 			}
 		}
 		else
