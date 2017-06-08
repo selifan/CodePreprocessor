@@ -85,6 +85,14 @@ Second supported **FOR** operator form:
 **#FOR** var_name IN value1,value2,... - in this form loop you pass a list of all values for loop variable (var_name), delimited by comma or space char.
   Inside loop you can use **%var_name%** macro to be substituted with current variable value
 
+Spaces and commas treated as item delimiters. If you need them in your string values, just use single or double quotes:
+
+```php
+$codeline = "#FOR LOOPVAR1 IN STRG1, STRG2, "Two Words, and another one"
+$tokens = $preproc -> parseToTokens($codeline);
+print_r($tokens);
+```
+
 ## Method list
 
 `setLF($style)` : sets "new line" char to "windows" or unix style. By default, when creating instance, "new line" chars
@@ -127,7 +135,7 @@ After that all found "{{some_var}}" strings in your source code will be replaced
 
 
 ## Nesting
-Unlimited depth of macros nesting supported (SWITCH inside IF/ELSEIF/ELSE inside IF ...)
+Unlimited depth of macros nesting supported (SWITCH inside IF/ELSEIF/ELSE inside IF, FOR/ENDFOR etc)
 
 Working sample demonstrating code preprocessing is in "tests" folder :
 [tests/preproc.php](tests/preproc.php)
